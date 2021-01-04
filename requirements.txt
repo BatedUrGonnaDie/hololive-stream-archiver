@@ -1,0 +1,3 @@
+git+git://github.com/kkroening/ffmpeg-python@master
+requests
+youtube_dl
