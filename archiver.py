@@ -56,7 +56,7 @@ if __name__ == '__main__':
                 if video_key in captured_ids:
                     continue
 
-                if (stream['channel']['name'] in channels_archive or video_key in videos_archive) and video_key not in captured_ids:
+                if (stream['channel']['yt_channel_id'] in channels_archive or video_key in videos_archive) and video_key not in captured_ids:
                     download = VideoDownload(video_key)
                     CAPTURED_VIDEOS.append(download)
         except KeyboardInterrupt:
