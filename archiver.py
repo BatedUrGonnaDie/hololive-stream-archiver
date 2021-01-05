@@ -4,7 +4,6 @@ import argparse
 import os
 import sys
 import time
-import traceback
 from typing import List
 
 import requests
@@ -35,22 +34,27 @@ if __name__ == '__main__':
         pass
 
     while True:
-        with open('channels.txt', 'a+') as fin:
-            fin.seek(0)
-            channels_archive = [x.strip() for x in fin.readlines() if x.strip()]
-
-        with open('videos.txt', 'a+') as fin:
-            fin.seek(0)
-            videos_archive = [x.strip() for x in fin.readlines() if x.strip()]
-
-        if not channels_archive and not videos_archive:
-            time.sleep(60)
-            continue
-
         try:
-            captured_ids = list(map(lambda v: v.video_id, CAPTURED_VIDEOS))
-            hololive_json = requests.get(consts.SCHEDULE).json()
+            with open('channels.txt', 'a+') as fin:
+                fin.seek(0)
+                channels_archive = [x.strip() for x in fin.readlines() if x.strip()]
 
+            with open('videos.txt', 'a+') as fin:
+                fin.seek(0)
+                videos_archive = [x.strip() for x in fin.readlines() if x.strip()]
+
+            if not channels_archive and not videos_archive:
+                time.sleep(60)
+                continue
+
+            captured_ids = list(map(lambda v: v.video_id, CAPTURED_VIDEOS))
+            schedule_request = requests.get(consts.SCHEDULE)
+            if schedule_request.status_code != 200:
+                print('Schedule HTTP request failed')
+                time.sleep(60)
+                continue
+
+            hololive_json = schedule_request.json()
             for stream in hololive_json['live']:
                 video_key: str = stream['yt_video_key']
                 if video_key in captured_ids:
@@ -59,14 +63,12 @@ if __name__ == '__main__':
                 if (stream['channel']['yt_channel_id'] in channels_archive or video_key in videos_archive) and video_key not in captured_ids:
                     download = VideoDownload(video_key)
                     CAPTURED_VIDEOS.append(download)
+
+            time.sleep(60)
         except KeyboardInterrupt:
-            print('Waiting for stream downloads to finish, ctrl + c again to force close...')
-            for video in CAPTURED_VIDEOS:
-                video.thread.join()
+            break
 
-            sys.exit(0)
-        except Exception as ex:
-            print("Uncaught error")
-            traceback.print_exc()
-
-        time.sleep(60)
+    # this is broken, not sure why ffmpeg keeps exiting instantly as well
+    print('Waiting for stream downloads to finish, ctrl + c again to force close...')
+    for video in CAPTURED_VIDEOS:
+        video.thread.join()

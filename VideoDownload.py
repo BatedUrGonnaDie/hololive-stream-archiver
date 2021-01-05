@@ -1,9 +1,7 @@
 import os
-import re
 import shutil
 from threading import Thread
 import time
-import traceback
 
 import ffmpeg
 import requests
@@ -43,13 +41,11 @@ class VideoDownload:
             try:
                 info = yt_dl.extract_info(consts.YT_VIDEO_URL.format(id=self.video_id), download=False)
                 break
-            except youtube_dl.utils.DownloadError as dl_ex:
-                if re.match(r'^ERROR: This live event will begin in \d+? hours\.$', str(dl_ex)):
-                    pass
-                else:
-                    traceback.print_exc()
+            except youtube_dl.utils.DownloadError:
+                # assume download errors are from retrieving slightly too early
+                pass
 
-                time.sleep(10)
+            time.sleep(10)
 
         self.url = info['url']
         self.title = info['title']
@@ -108,13 +104,24 @@ class VideoDownload:
         except FileExistsError:
             pass
 
+        # shutil.move error'ing saying directory doesn't exist, might be a filesystem caching problem
+        # ensure that the newly created folder exists before trying to move to it
+        while not os.path.isdir(f'{VideoDownload.backup_path}/{self.uploader}'):
+            time.sleep(1)
+
         shutil.move(
             f'{self.temp_video_path}.{VideoDownload.mux_extension}',
             f'{VideoDownload.backup_path}/{self.uploader}/{self.title}_{self.video_id}.{VideoDownload.mux_extension}'
         )
         print(f'Finished downloading video for: {self.title}_{self.video_id}')
 
+    def cleanup_tmp_files(self):
+        os.remove(self.thumbnail_filename)
+        os.remove(f'{self.temp_video_path}.ts')
+        print(f'Cleaned up temp files for: {self.title}_{self.video_id}')
+
     def process_video_download(self):
         self.extract_video_info()
         self.download_thumbnail()
         self.download_video()
+        self.cleanup_tmp_files()
